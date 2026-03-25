@@ -8,15 +8,17 @@
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════════════
-     HEADER — Series name, event, and session info
-     ═══════════════════════════════════════════════════════════════════ -->
 <header>
     <div class="header-content">
         <h1>{{ event_info.series }} Endurance Racing Dashboard</h1>
         <div class="event-info">
             <span class="event-name">{{ event_info.event_name }}</span>
             <span class="session-name">{{ event_info.session_name }}</span>
+            {% if entries %}
+            <span class="session-type-badge session-type-{{ event_info.session_type }}">
+                {{ event_info.session_type | upper }}
+            </span>
+            {% endif %}
         </div>
         <div class="refresh-hint">Data refreshes on page reload (cached 10s)</div>
     </div>
@@ -24,7 +26,6 @@
 
 <main>
 
-    <!-- ─── Error State ──────────────────────────────────────────── -->
     {% if error %}
     <section class="card error-card">
         <h2>No Live Data Available</h2>
@@ -32,14 +33,614 @@
         <p class="help-text">
             This usually means there is no active IMSA session right now.
             Check <a href="https://www.imsa.com/scoring/" target="_blank" rel="noopener">imsa.com/scoring</a>
-            during a live race or practice session.
+            during a live race, qualifying, or practice session.
         </p>
     </section>
     {% endif %}
 
     {% if entries %}
 
-    <!-- ─── ALERTS / ANOMALIES ───────────────────────────────────── -->
+    {# ═══════════════════════════════════════════════════════════════════
+       ██  PRACTICE SESSION VIEW
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if event_info.session_type == "practice" and practice %}
+
+    <!-- ─── Session Summary Stats ────────────────────────────────── -->
+    {% if practice.session_stats %}
+    {% set stats = practice.session_stats %}
+    <section class="card" id="session-stats">
+        <h2>Session Summary</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_cars }}</div>
+                <div class="stat-label">Total Cars</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.cars_with_time }}</div>
+                <div class="stat-label">Set a Time</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_classes }}</div>
+                <div class="stat-label">Classes</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_laps }}</div>
+                <div class="stat-label">Total Laps</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.avg_laps_per_car }}</div>
+                <div class="stat-label">Avg Laps/Car</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.fastest_time | lap_time }}</div>
+                <div class="stat-label">Fastest Lap</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{% if stats.overall_spread %}{{ "%.3f" | format(stats.overall_spread) }}s{% else %}--{% endif %}</div>
+                <div class="stat-label">Field Spread</div>
+            </div>
+            {% if stats.cars_no_time > 0 %}
+            <div class="stat-box stat-warning">
+                <div class="stat-value">{{ stats.cars_no_time }}</div>
+                <div class="stat-label">No Time Set</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- ─── Practice Insights ────────────────────────────────────── -->
+    <section class="card" id="insights">
+        <h2>Key Takeaways</h2>
+        {% if practice.insights %}
+        <div class="alerts-list">
+            {% for insight in practice.insights %}
+            <div class="alert alert-{{ 'warning' if insight.type == 'warning' else 'info' if insight.type in ('speed','mileage','consistency','stats') else 'critical' if insight.type == 'battle' else 'info' }}">
+                <span class="alert-badge">{{ insight.type | upper }}</span>
+                {{ insight.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Not enough data for insights yet.</p>
+        {% endif %}
+    </section>
+
+    <!-- ─── Class Speed Comparison ───────────────────────────────── -->
+    {% if practice.class_summary %}
+    <section class="card" id="class-comparison">
+        <h2>Class Speed Comparison</h2>
+        <p class="section-desc">How each class compares — fastest time, spread within class, and car count.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Cars</th>
+                    <th>Fastest Car</th>
+                    <th>Fastest Time</th>
+                    <th>Slowest Time</th>
+                    <th>Class Spread</th>
+                    <th>Avg Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cs in practice.class_summary %}
+                <tr>
+                    <td><span class="class-badge class-{{ cs.class_name | lower | replace(' ', '-') }}">{{ cs.class_name }}</span></td>
+                    <td>{{ cs.car_count }}</td>
+                    <td><strong>#{{ cs.fastest_car }}</strong> {{ cs.fastest_team }}</td>
+                    <td class="highlight-time">{{ cs.fastest_time | lap_time }}</td>
+                    <td>{{ cs.slowest_time | lap_time }}</td>
+                    <td class="{{ 'highlight-good' if cs.spread < 1.0 else 'highlight-ok' if cs.spread < 2.0 else '' }}">{{ "%.3f" | format(cs.spread) }}s</td>
+                    <td>{{ cs.average_time | lap_time }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ─── Fastest Laps Overall ─────────────────────────────────── -->
+    <section class="card" id="fastest">
+        <h2>Fastest Laps — Overall Top 10</h2>
+        {% if practice.fastest_overall %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Best Lap</th>
+                    <th>Laps Run</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in practice.fastest_overall %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td class="highlight-time">{{ car.best_lap_time | lap_time }}</td>
+                    <td>{{ car.laps_completed }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+
+    <!-- ─── Fastest per Class ────────────────────────────────────── -->
+    {% for class_name, cars in practice.class_fastest.items() %}
+    <section class="card" id="fastest-{{ class_name | lower | replace(' ', '-') }}">
+        <h2>
+            <span class="class-badge class-{{ class_name | lower | replace(' ', '-') }}">{{ class_name }}</span>
+            Fastest in Class
+        </h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Best Lap</th>
+                    <th>Gap to P1</th>
+                    <th>Laps</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in cars %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td class="{{ 'highlight-time' if loop.index == 1 }}">{{ car.best_lap_time | lap_time }}</td>
+                    <td>
+                        {% if loop.index == 1 %}--
+                        {% elif car.best_lap_time and cars[0].best_lap_time %}+{{ "%.3f" | format(car.best_lap_time - cars[0].best_lap_time) }}s
+                        {% else %}--{% endif %}
+                    </td>
+                    <td>{{ car.laps_completed }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endfor %}
+
+    <!-- ─── Improvement Tracker ──────────────────────────────────── -->
+    {% if practice.improvement %}
+    <section class="card" id="improvement">
+        <h2>Pace Trend</h2>
+        <p class="section-desc">Is each car still finding speed or have they peaked? Based on how their last lap compares to their best.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Best Lap</th>
+                    <th>Last Lap</th>
+                    <th>Diff</th>
+                    <th>Trend</th>
+                    <th>Laps</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in practice.improvement %}
+                <tr>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td>{{ car.best_lap_time | lap_time }}</td>
+                    <td>{{ car.last_lap_time | lap_time }}</td>
+                    <td>{{ "%+.3f" | format(car.diff) }}s</td>
+                    <td>
+                        {% if car.status == "improving" %}
+                        <span class="trend-badge trend-improving">IMPROVING</span>
+                        {% elif car.status == "peaked" %}
+                        <span class="trend-badge trend-peaked">PEAKED</span>
+                        {% elif car.status == "close" %}
+                        <span class="trend-badge trend-close">CLOSE</span>
+                        {% else %}
+                        <span class="trend-badge trend-searching">SEARCHING</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ car.laps_completed }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ─── Consistency Ranking ──────────────────────────────────── -->
+    {% if practice.consistency %}
+    <section class="card" id="consistency">
+        <h2>Consistency Ranking</h2>
+        <p class="section-desc">Gap between last lap and best lap. Smaller gap = more consistent, car and driver are dialed in. Important for endurance races where consistency wins.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Best Lap</th>
+                    <th>Last Lap</th>
+                    <th>Gap</th>
+                    <th>% Off Best</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in practice.consistency %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td>{{ car.best_lap_time | lap_time }}</td>
+                    <td>{{ car.last_lap_time | lap_time }}</td>
+                    <td class="{{ 'highlight-good' if car.consistency_gap < 0.5 else 'highlight-ok' if car.consistency_gap < 1.5 else '' }}">
+                        +{{ "%.3f" | format(car.consistency_gap) }}s
+                    </td>
+                    <td>{{ car.pct_off_best }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ─── Session Mileage ──────────────────────────────────────── -->
+    <section class="card" id="mileage">
+        <h2>Session Mileage</h2>
+        <p class="section-desc">Teams with the most laps collected the most data and had the most reliable cars. Very low lap counts may indicate mechanical issues or red flags.</p>
+        {% if practice.mileage %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Laps</th>
+                    <th>Best Lap</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in practice.mileage %}
+                <tr>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td><strong>{{ car.laps_completed }}</strong></td>
+                    <td>{{ car.best_lap_time | lap_time }}</td>
+                    <td>
+                        {% if car.pit_status == 'IN_PIT' %}
+                        <span class="status-pit">PIT</span>
+                        {% else %}
+                        <span class="status-track">RUN</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+
+    <!-- ─── Cars With No Time ────────────────────────────────────── -->
+    {% if practice.no_time_cars %}
+    <section class="card card-warning" id="no-time">
+        <h2>Cars With No Timed Lap</h2>
+        <p class="section-desc">These cars entered the session but never completed a timed lap. Could be mechanical issues, setup problems, or late arrival.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Laps</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in practice.no_time_cars %}
+                <tr>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td>{{ car.laps_completed }}</td>
+                    <td>
+                        {% if car.pit_status == 'IN_PIT' %}
+                        <span class="status-pit">PIT</span>
+                        {% else %}
+                        <span class="status-track">RUN</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+
+    {# ═══════════════════════════════════════════════════════════════════
+       ██  QUALIFYING SESSION VIEW
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% elif event_info.session_type == "qualifying" and qualifying %}
+
+    <!-- ─── Session Summary Stats ────────────────────────────────── -->
+    {% if qualifying.session_stats %}
+    {% set stats = qualifying.session_stats %}
+    <section class="card" id="session-stats">
+        <h2>Qualifying Summary</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_cars }}</div>
+                <div class="stat-label">Total Cars</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.cars_with_time }}</div>
+                <div class="stat-label">Qualified</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_classes }}</div>
+                <div class="stat-label">Classes</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.total_laps_attempted }}</div>
+                <div class="stat-label">Total Laps</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.avg_laps_per_car }}</div>
+                <div class="stat-label">Avg Laps/Car</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ stats.fastest_time | lap_time }}</div>
+                <div class="stat-label">Pole Time</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{% if stats.field_spread %}{{ "%.3f" | format(stats.field_spread) }}s{% else %}--{% endif %}</div>
+                <div class="stat-label">Field Spread</div>
+            </div>
+            {% if stats.cars_no_time > 0 %}
+            <div class="stat-box stat-warning">
+                <div class="stat-value">{{ stats.cars_no_time }}</div>
+                <div class="stat-label">DNQ / No Time</div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- ─── Qualifying Insights ──────────────────────────────────── -->
+    <section class="card" id="insights">
+        <h2>Key Takeaways</h2>
+        {% if qualifying.insights %}
+        <div class="alerts-list">
+            {% for insight in qualifying.insights %}
+            <div class="alert alert-{{ 'warning' if insight.type == 'warning' else 'critical' if insight.type == 'battle' else 'info' }}">
+                <span class="alert-badge">{{ insight.type | upper | replace('_', ' ') }}</span>
+                {{ insight.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- ─── Pole Position Battles ────────────────────────────────── -->
+    {% if qualifying.pole_battles %}
+    <section class="card" id="pole-battles">
+        <h2>Pole Position Battles</h2>
+        <p class="section-desc">How close was the fight for pole in each class.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Pole</th>
+                    <th>Driver</th>
+                    <th>Pole Time</th>
+                    <th>Laps</th>
+                    <th>2nd Place</th>
+                    <th>Driver</th>
+                    <th>2nd Time</th>
+                    <th>Gap</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in qualifying.pole_battles %}
+                <tr>
+                    <td><span class="class-badge class-{{ b.class_name | lower | replace(' ', '-') }}">{{ b.class_name }}</span></td>
+                    <td><strong>#{{ b.pole_car }}</strong> {{ b.pole_team }}</td>
+                    <td>{{ b.pole_driver }}</td>
+                    <td class="highlight-time">{{ b.pole_time | lap_time }}</td>
+                    <td>{{ b.pole_laps }}</td>
+                    <td>#{{ b.second_car }} {{ b.second_team }}</td>
+                    <td>{{ b.second_driver }}</td>
+                    <td>{{ b.second_time | lap_time }}</td>
+                    <td class="{{ 'highlight-close' if b.close else '' }}">+{{ "%.3f" | format(b.gap) }}s</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ─── Tight Battles ────────────────────────────────────────── -->
+    {% if qualifying.tight_battles %}
+    <section class="card" id="tight-battles">
+        <h2>Battles to Watch (Gap &lt; 0.3s)</h2>
+        <p class="section-desc">Every pair of cars separated by less than three tenths. These will likely battle hard in the race.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Scope</th>
+                    <th>Position</th>
+                    <th>Car Ahead</th>
+                    <th>Class</th>
+                    <th>Car Behind</th>
+                    <th>Class</th>
+                    <th>Gap</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in qualifying.tight_battles %}
+                <tr>
+                    <td>{{ b.scope | upper }}</td>
+                    <td>P{{ b.pos_ahead }} / P{{ b.pos_behind }}</td>
+                    <td><strong>#{{ b.car_ahead }}</strong></td>
+                    <td><span class="class-badge class-{{ b.class_ahead | lower | replace(' ', '-') }}">{{ b.class_ahead }}</span></td>
+                    <td><strong>#{{ b.car_behind }}</strong></td>
+                    <td><span class="class-badge class-{{ b.class_behind | lower | replace(' ', '-') }}">{{ b.class_behind }}</span></td>
+                    <td class="highlight-close">{{ "%.3f" | format(b.gap) }}s</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ─── Gap Ladder (Overall Grid with gap to car ahead) ──────── -->
+    {% if qualifying.gap_ladder %}
+    <section class="card" id="gap-ladder">
+        <h2>Full Grid — Gap Ladder</h2>
+        <p class="section-desc">Every car's gap to the car directly ahead AND to pole. Shows where the field bunches up and where there are big gaps.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Grid</th>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Qual Time</th>
+                    <th>Gap to Ahead</th>
+                    <th>Gap to Pole</th>
+                    <th>Laps</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in qualifying.gap_ladder %}
+                <tr>
+                    <td><strong>{{ car.position }}</strong></td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td class="{{ 'highlight-time' if car.position == 1 }}">{{ car.best_lap_time | lap_time }}</td>
+                    <td>
+                        {% if car.gap_to_ahead is none %}
+                        <span class="highlight-time">POLE</span>
+                        {% else %}
+                        <span class="{{ 'highlight-close' if car.gap_to_ahead < 0.3 else 'highlight-good' if car.gap_to_ahead < 0.5 else '' }}">+{{ "%.3f" | format(car.gap_to_ahead) }}s</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if car.gap_to_pole is none %}--
+                        {% else %}+{{ "%.3f" | format(car.gap_to_pole) }}s{% endif %}
+                    </td>
+                    <td>{{ car.laps_completed }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ─── Class Qualifying Results ─────────────────────────────── -->
+    {% for class_name, cars in qualifying.class_grids.items() %}
+    <section class="card" id="grid-{{ class_name | lower | replace(' ', '-') }}">
+        <h2>
+            <span class="class-badge class-{{ class_name | lower | replace(' ', '-') }}">{{ class_name }}</span>
+            Qualifying Results
+        </h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Class P</th>
+                    <th>Grid P</th>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Qual Time</th>
+                    <th>Gap to Pole</th>
+                    <th>Laps</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in cars %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ car.overall_position or '--' }}</td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td class="{{ 'highlight-time' if loop.index == 1 }}">{{ car.best_lap_time | lap_time }}</td>
+                    <td>
+                        {% if loop.index == 1 %}POLE
+                        {% elif car.best_lap_time and cars[0].best_lap_time %}+{{ "%.3f" | format(car.best_lap_time - cars[0].best_lap_time) }}s
+                        {% else %}--{% endif %}
+                    </td>
+                    <td>{{ car.laps_completed }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endfor %}
+
+    <!-- ─── Cars That Did Not Qualify ────────────────────────────── -->
+    {% if qualifying.no_time_cars %}
+    <section class="card card-warning" id="dnq">
+        <h2>Did Not Qualify / No Time</h2>
+        <p class="section-desc">These cars did not set a qualifying time. They will likely start at the back of the grid.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Laps Attempted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in qualifying.no_time_cars %}
+                <tr>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td>{{ car.laps_completed }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+
+    {# ═══════════════════════════════════════════════════════════════════
+       ██  RACE SESSION VIEW
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% else %}
+
     <section class="card" id="alerts">
         <h2>Race Alerts &amp; Anomalies</h2>
         {% if anomalies %}
@@ -57,7 +658,6 @@
         {% endif %}
     </section>
 
-    <!-- ─── PREDICTIONS ──────────────────────────────────────────── -->
     <section class="card" id="predictions">
         <h2>Overtake Predictions</h2>
         {% if predictions %}
@@ -90,7 +690,6 @@
         {% endif %}
     </section>
 
-    <!-- ─── OVERALL LEADERBOARD ──────────────────────────────────── -->
     <section class="card" id="leaderboard">
         <h2>Overall Leaderboard</h2>
         <table>
@@ -135,7 +734,6 @@
         </table>
     </section>
 
-    <!-- ─── CLASS LEADERBOARDS ───────────────────────────────────── -->
     {% for class_name, cars in classes.items() %}
     <section class="card" id="class-{{ class_name | lower | replace(' ', '-') }}">
         <h2>
@@ -175,7 +773,6 @@
     </section>
     {% endfor %}
 
-    <!-- ─── STINT TRACKER ────────────────────────────────────────── -->
     <section class="card" id="stints">
         <h2>Stint &amp; Pit Tracker</h2>
         <table>
@@ -209,6 +806,8 @@
             </tbody>
         </table>
     </section>
+
+    {% endif %}
 
     {% endif %}
 

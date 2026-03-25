@@ -40,6 +40,7 @@ from services.data_normalizer import (
     validate_entries,
 )
 from services.predictor import compute_stint_info, predict_overtakes
+from services.session_analyzer import analyze_practice, analyze_qualifying
 
 # ─── Logging Setup ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -108,6 +109,8 @@ def dashboard(series: str):
             anomalies=[],
             predictions=[],
             stints=[],
+            practice={},
+            qualifying={},
         )
 
     adapter = ADAPTERS[series]
@@ -139,6 +142,8 @@ def dashboard(series: str):
             anomalies=[],
             predictions=[],
             stints=[],
+            practice={},
+            qualifying={},
         )
 
     except Exception as exc:
@@ -152,6 +157,8 @@ def dashboard(series: str):
             anomalies=[],
             predictions=[],
             stints=[],
+            practice={},
+            qualifying={},
         )
 
 
@@ -160,12 +167,30 @@ def _render_dashboard(entries: list[dict]) -> str:
     Given normalized entries, compute all analytics and render the template.
     Separated into its own function so both cache-hit and fresh-fetch paths
     can use it without duplicating logic.
+
+    The session_type (practice/qualifying/race) determines which analysis
+    is run and which sections the template displays.
     """
     event_info = get_event_info(entries)
     classes = group_by_class(entries)
+    session_type = event_info.get("session_type", "race")
+
+    # Always compute these (useful for all session types)
     anomalies = detect_anomalies(entries)
-    predictions = predict_overtakes(entries)
-    stints = compute_stint_info(entries)
+
+    # Session-specific analysis
+    predictions = []
+    stints = []
+    practice_data = {}
+    qualifying_data = {}
+
+    if session_type == "practice":
+        practice_data = analyze_practice(entries)
+    elif session_type == "qualifying":
+        qualifying_data = analyze_qualifying(entries)
+    else:  # race
+        predictions = predict_overtakes(entries)
+        stints = compute_stint_info(entries)
 
     return render_template(
         "dashboard.html",
@@ -176,6 +201,8 @@ def _render_dashboard(entries: list[dict]) -> str:
         anomalies=anomalies,
         predictions=predictions,
         stints=stints,
+        practice=practice_data,
+        qualifying=qualifying_data,
     )
 
 

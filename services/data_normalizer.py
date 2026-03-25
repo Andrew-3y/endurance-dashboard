@@ -97,17 +97,22 @@ def format_lap_time(seconds: float | None) -> str:
 def get_event_info(entries: list[dict]) -> dict:
     """
     Extract event-level metadata from the first entry.
-    Returns dict with series, event_name, session_name.
+    Returns dict with series, event_name, session_name, session_type.
     """
+    from services.session_analyzer import detect_session_type
+
     if not entries:
         return {
             "series": "Unknown",
             "event_name": "No Active Session",
             "session_name": "--",
+            "session_type": "race",
         }
     first = entries[0]
+    session_name = first.get("session_name") or "Unknown Session"
     return {
         "series": first.get("series") or "Unknown",
         "event_name": first.get("event_name") or "Unknown Event",
-        "session_name": first.get("session_name") or "Unknown Session",
+        "session_name": session_name,
+        "session_type": detect_session_type(session_name),
     }

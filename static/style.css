@@ -266,6 +266,115 @@ tbody tr.in-pit {
     margin-right: 0.3rem;
 }
 
+/* ─── Session Type Badges ───────────────────────────────────────────── */
+.session-type-badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-left: 0.75rem;
+    vertical-align: middle;
+    color: #fff;
+}
+
+.session-type-practice   { background: #00bcd4; }
+.session-type-qualifying { background: #e040fb; }
+.session-type-race       { background: #f85149; }
+
+/* ─── Highlighted Cells ────────────────────────────────────────────── */
+.highlight-time {
+    color: #e040fb;
+    font-weight: 600;
+}
+
+.highlight-good {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.highlight-ok {
+    color: var(--warning);
+}
+
+.highlight-close {
+    color: #e040fb;
+    font-weight: 700;
+}
+
+/* ─── Section Descriptions ─────────────────────────────────────────── */
+.section-desc {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    margin-bottom: 0.75rem;
+}
+
+/* ─── Stats Grid (session summary boxes) ───────────────────────────── */
+.stats-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.stat-box {
+    background: var(--bg-table-row);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    min-width: 120px;
+    flex: 1;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+}
+
+.stat-warning {
+    border-color: var(--warning);
+}
+
+.stat-warning .stat-value {
+    color: var(--warning);
+}
+
+/* ─── Trend Badges (improvement tracker) ───────────────────────────── */
+.trend-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #000;
+}
+
+.trend-improving { background: var(--success); }
+.trend-peaked    { background: var(--accent); color: #fff; }
+.trend-close     { background: var(--warning); }
+.trend-searching { background: var(--text-muted); color: #fff; }
+
+/* ─── Warning Card ─────────────────────────────────────────────────── */
+.card-warning {
+    border-color: var(--warning);
+}
+
+.card-warning h2 {
+    color: var(--warning);
+}
+
 /* ─── Utility ───────────────────────────────────────────────────────── */
 .muted {
     color: var(--text-muted);
@@ -290,6 +399,9 @@ footer {
     table { font-size: 0.78rem; }
     thead th, tbody td { padding: 0.3rem 0.4rem; }
     header h1 { font-size: 1.1rem; }
+    .stats-grid { gap: 0.5rem; }
+    .stat-box { min-width: 90px; padding: 0.5rem 0.6rem; }
+    .stat-value { font-size: 1.1rem; }
 }
 
 @media (max-width: 600px) {
