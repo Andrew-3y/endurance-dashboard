@@ -204,7 +204,7 @@ def dashboard(series: str):
             auto_message=None,
             last_updated=None,
             live_fetch_error=None,
-        )
+        ), 404
 
     adapter = ADAPTERS[series]
     cache = CACHES[series]

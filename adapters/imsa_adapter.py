@@ -84,6 +84,19 @@ def _try_fetch(base_urls: list[str], paths: list[str]) -> dict | None:
     return None
 
 
+def _looks_like_car_entry(item: Any) -> bool:
+    """Heuristic guard to avoid treating metadata lists as car lists."""
+    if not isinstance(item, dict):
+        return False
+    likely_keys = {
+        "Number", "CarNumber", "car_number",
+        "Class", "ClassID", "class_name",
+        "Team", "TeamName", "team_name",
+        "OverallPosition", "Position", "overall_position",
+    }
+    return any(key in item for key in likely_keys)
+
+
 def _parse_lap_time(raw: Any) -> float | None:
     """
     Convert a lap time string like "1:34.567" or "94.567" to total seconds.
@@ -164,7 +177,7 @@ class IMSAAdapter(BaseAdapter):
                 # Maybe the entire dict is keyed by class
                 for value in results.values():
                     if isinstance(value, list) and len(value) > 0:
-                        cars.extend(value)
+                        cars.extend([item for item in value if _looks_like_car_entry(item)])
 
         if not cars:
             raise AdapterError(
@@ -174,7 +187,8 @@ class IMSAAdapter(BaseAdapter):
 
         # Attach session-level metadata to each car entry for normalization
         for car in cars:
-            car["_session_info"] = session_info
+            if isinstance(car, dict):
+                car["_session_info"] = session_info
 
         return cars
 
@@ -192,6 +206,10 @@ class IMSAAdapter(BaseAdapter):
         normalized = []
 
         for car in parsed_data:
+            if not isinstance(car, dict):
+                logger.warning("Skipping malformed IMSA car entry: %r", car)
+                continue
+
             session_info = car.pop("_session_info", {})
 
             entry = {

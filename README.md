@@ -181,7 +181,7 @@ Every adapter — regardless of series — must output entries conforming to thi
 | Layer | Technology |
 |---|---|
 | Web framework | Python 3.11 / Flask 3.x |
-| Data processing | Pandas |
+| Data processing | Native Python services |
 | Templates | Jinja2 |
 | Styling | Plain CSS (dark theme, no frameworks) |
 | Production server | Gunicorn |

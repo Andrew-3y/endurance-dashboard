@@ -10,11 +10,13 @@ WHY:
 import json
 import logging
 import os
+import re
 import sqlite3
 from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any
 
+from services.data_normalizer import validate_entries
 from services.session_analyzer import detect_session_type
 
 logger = logging.getLogger(__name__)
@@ -53,11 +55,33 @@ def init_storage() -> None:
         conn.commit()
 
 
+def _extract_season_year(event_name: str, session_name: str, entries: list[dict]) -> int:
+    """
+    Derive a stable season/year marker for session identity.
+    Prevents cross-year overwrites for similarly named events/sessions.
+    """
+    for text in (event_name, session_name):
+        match = re.search(r"\b(20\d{2})\b", text)
+        if match:
+            return int(match.group(1))
+
+    if entries:
+        ts = entries[0].get("timestamp")
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts.replace("Z", "+00:00")).year
+            except ValueError:
+                pass
+
+    return datetime.now(timezone.utc).year
+
+
 def save_session_data(series: str, entries: list[dict]) -> int | None:
     """
     Save (or update) a session snapshot in SQLite.
     Returns the session id when successful.
     """
+    entries = validate_entries(entries)
     if not entries:
         return None
 
@@ -67,7 +91,10 @@ def save_session_data(series: str, entries: list[dict]) -> int | None:
     event_name = str(first.get("event_name") or "Unknown Event")
     session_name = str(first.get("session_name") or "Unknown Session")
     session_type = str(first.get("session_type") or detect_session_type(session_name))
-    session_key = f"{series.lower()}|{event_name}|{session_name}"
+    season_year = _extract_season_year(event_name, session_name, entries)
+    event_key = " ".join(event_name.strip().lower().split())
+    session_key_name = " ".join(session_name.strip().lower().split())
+    session_key = f"{series.lower()}|{season_year}|{event_key}|{session_key_name}"
     now = _utc_now_iso()
     data_json = json.dumps(entries)
 
@@ -170,4 +197,6 @@ def load_session_data(session_id: int | str) -> list[dict]:
         logger.warning("Corrupt JSON for session id=%s", sid)
         return []
 
-    return data if isinstance(data, list) else []
+    if not isinstance(data, list):
+        return []
+    return validate_entries(data)
