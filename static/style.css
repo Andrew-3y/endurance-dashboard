@@ -1,0 +1,298 @@
+/*
+  style.css — Dashboard styling for the Endurance Racing Dashboard.
+
+  DESIGN GOALS:
+    - Dark theme (racing dashboards are typically dark — easier on eyes during long races)
+    - High contrast for readability
+    - Compact tables (lots of data, minimal scrolling)
+    - Color-coded class badges (each racing class gets a distinct color)
+    - Responsive (works on desktop and tablet)
+    - Lightweight — no frameworks, just plain CSS
+*/
+
+/* ─── Reset & Base ──────────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg-primary: #0d1117;
+    --bg-card: #161b22;
+    --bg-table-row: #1c2128;
+    --bg-table-hover: #252c35;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --danger: #f85149;
+    --warning: #d29922;
+    --success: #3fb950;
+    --info: #58a6ff;
+
+    /* Class colors — distinct, high contrast on dark bg */
+    --class-gtp: #e040fb;
+    --class-lmp2: #448aff;
+    --class-lmp3: #00bcd4;
+    --class-gtd: #ff9800;
+    --class-gtd-pro: #ff5722;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* ─── Header ────────────────────────────────────────────────────────── */
+header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+header h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.event-info {
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.event-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.session-name {
+    margin-left: 0.75rem;
+    color: var(--accent);
+}
+
+.refresh-hint {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ─── Main Content ──────────────────────────────────────────────────── */
+main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
+}
+
+/* ─── Cards ─────────────────────────────────────────────────────────── */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.card h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ─── Error Card ────────────────────────────────────────────────────── */
+.error-card {
+    border-color: var(--warning);
+    background: #1c1a11;
+}
+
+.error-card h2 {
+    color: var(--warning);
+}
+
+.help-text {
+    margin-top: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* ─── Tables ────────────────────────────────────────────────────────── */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+thead th {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+tbody td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+tbody tr:nth-child(even) {
+    background: var(--bg-table-row);
+}
+
+tbody tr:hover {
+    background: var(--bg-table-hover);
+}
+
+/* Car in pit — dim it slightly */
+tbody tr.in-pit {
+    opacity: 0.6;
+}
+
+/* ─── Class Badges ──────────────────────────────────────────────────── */
+.class-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #fff;
+    background: var(--text-muted);
+}
+
+.class-gtp                  { background: var(--class-gtp); }
+.class-lmp2                 { background: var(--class-lmp2); }
+.class-lmp3                 { background: var(--class-lmp3); }
+.class-gtd                  { background: var(--class-gtd); }
+.class-gtd-pro,
+.class-gtd-pro              { background: var(--class-gtd-pro); }
+
+/* ─── Status Badges ─────────────────────────────────────────────────── */
+.status-pit {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: var(--warning);
+    color: #000;
+}
+
+.status-track {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: var(--success);
+    color: #000;
+}
+
+/* ─── Alerts ────────────────────────────────────────────────────────── */
+.alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.alert {
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    border-left: 4px solid var(--border);
+    background: var(--bg-table-row);
+}
+
+.alert-critical {
+    border-left-color: var(--danger);
+    background: #1f1315;
+}
+
+.alert-warning {
+    border-left-color: var(--warning);
+    background: #1c1a11;
+}
+
+.alert-info {
+    border-left-color: var(--info);
+    background: #111a2c;
+}
+
+.alert-badge {
+    display: inline-block;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-right: 0.4rem;
+    color: #fff;
+}
+
+.alert-critical .alert-badge { background: var(--danger); }
+.alert-warning .alert-badge  { background: var(--warning); color: #000; }
+.alert-info .alert-badge     { background: var(--info); }
+
+.alert-type {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    margin-right: 0.3rem;
+}
+
+/* ─── Utility ───────────────────────────────────────────────────────── */
+.muted {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* ─── Footer ────────────────────────────────────────────────────────── */
+footer {
+    max-width: 1400px;
+    margin: 2rem auto 1rem;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    main { padding: 0.75rem; }
+    .card { padding: 0.75rem; }
+    table { font-size: 0.78rem; }
+    thead th, tbody td { padding: 0.3rem 0.4rem; }
+    header h1 { font-size: 1.1rem; }
+}
+
+@media (max-width: 600px) {
+    /* Allow horizontal scroll on very narrow screens */
+    .card { overflow-x: auto; }
+}

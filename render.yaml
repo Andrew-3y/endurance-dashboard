@@ -1,0 +1,17 @@
+# render.yaml — Render deployment configuration
+# This file tells Render how to build and run the app.
+# Place it in the root of your GitHub repo.
+
+services:
+  - type: web
+    name: endurance-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 30
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+    # Render free tier spins down after 15 min of inactivity.
+    # The app starts fresh on the next request (cold start ~10-20s).
+    # This is fine — our app is designed for on-demand use.

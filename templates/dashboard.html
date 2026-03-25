@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event_info.series }} Endurance Racing Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     HEADER — Series name, event, and session info
+     ═══════════════════════════════════════════════════════════════════ -->
+<header>
+    <div class="header-content">
+        <h1>{{ event_info.series }} Endurance Racing Dashboard</h1>
+        <div class="event-info">
+            <span class="event-name">{{ event_info.event_name }}</span>
+            <span class="session-name">{{ event_info.session_name }}</span>
+        </div>
+        <div class="refresh-hint">Data refreshes on page reload (cached 10s)</div>
+    </div>
+</header>
+
+<main>
+
+    <!-- ─── Error State ──────────────────────────────────────────── -->
+    {% if error %}
+    <section class="card error-card">
+        <h2>No Live Data Available</h2>
+        <p>{{ error }}</p>
+        <p class="help-text">
+            This usually means there is no active IMSA session right now.
+            Check <a href="https://www.imsa.com/scoring/" target="_blank" rel="noopener">imsa.com/scoring</a>
+            during a live race or practice session.
+        </p>
+    </section>
+    {% endif %}
+
+    {% if entries %}
+
+    <!-- ─── ALERTS / ANOMALIES ───────────────────────────────────── -->
+    <section class="card" id="alerts">
+        <h2>Race Alerts &amp; Anomalies</h2>
+        {% if anomalies %}
+        <div class="alerts-list">
+            {% for alert in anomalies %}
+            <div class="alert alert-{{ alert.severity }}">
+                <span class="alert-badge">{{ alert.severity | upper }}</span>
+                <span class="alert-type">[{{ alert.alert_type | replace('_', ' ') | title }}]</span>
+                {{ alert.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">No anomalies detected in current data.</p>
+        {% endif %}
+    </section>
+
+    <!-- ─── PREDICTIONS ──────────────────────────────────────────── -->
+    <section class="card" id="predictions">
+        <h2>Overtake Predictions</h2>
+        {% if predictions %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Chaser</th>
+                    <th>Target</th>
+                    <th>Gap</th>
+                    <th>Pace Adv.</th>
+                    <th>Est. Laps</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in predictions %}
+                <tr>
+                    <td><span class="class-badge class-{{ p.class_name | lower | replace(' ', '-') }}">{{ p.class_name }}</span></td>
+                    <td>#{{ p.chaser }}</td>
+                    <td>#{{ p.target }}</td>
+                    <td>{{ p.gap_seconds }}s</td>
+                    <td>{{ p.pace_diff }}s/lap</td>
+                    <td>~{{ p.laps_to_catch }} laps</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="muted">No overtake predictions available (insufficient pace data).</p>
+        {% endif %}
+    </section>
+
+    <!-- ─── OVERALL LEADERBOARD ──────────────────────────────────── -->
+    <section class="card" id="leaderboard">
+        <h2>Overall Leaderboard</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Pos</th>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Laps</th>
+                    <th>Gap</th>
+                    <th>Last Lap</th>
+                    <th>Best Lap</th>
+                    <th>Pits</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in entries %}
+                <tr class="{{ 'in-pit' if car.pit_status == 'IN_PIT' else '' }}">
+                    <td>{{ car.overall_position or '--' }}</td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ car.class_name | lower | replace(' ', '-') }}">{{ car.class_name }}</span></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td>{{ car.laps_completed }}</td>
+                    <td>{{ car.gap_to_leader }}</td>
+                    <td>{{ car.last_lap_time | lap_time }}</td>
+                    <td>{{ car.best_lap_time | lap_time }}</td>
+                    <td>{{ car.pit_stops }}</td>
+                    <td>
+                        {% if car.pit_status == 'IN_PIT' %}
+                        <span class="status-pit">PIT</span>
+                        {% else %}
+                        <span class="status-track">RUN</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ─── CLASS LEADERBOARDS ───────────────────────────────────── -->
+    {% for class_name, cars in classes.items() %}
+    <section class="card" id="class-{{ class_name | lower | replace(' ', '-') }}">
+        <h2>
+            <span class="class-badge class-{{ class_name | lower | replace(' ', '-') }}">{{ class_name }}</span>
+            Class Leaderboard
+        </h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>P</th>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>Driver</th>
+                    <th>Laps</th>
+                    <th>Class Gap</th>
+                    <th>Last Lap</th>
+                    <th>Best Lap</th>
+                    <th>Pits</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for car in cars %}
+                <tr class="{{ 'in-pit' if car.pit_status == 'IN_PIT' else '' }}">
+                    <td>{{ car.class_position or '--' }}</td>
+                    <td><strong>{{ car.car_number }}</strong></td>
+                    <td>{{ car.team_name }}</td>
+                    <td>{{ car.current_driver }}</td>
+                    <td>{{ car.laps_completed }}</td>
+                    <td>{{ car.gap_to_class_leader }}</td>
+                    <td>{{ car.last_lap_time | lap_time }}</td>
+                    <td>{{ car.best_lap_time | lap_time }}</td>
+                    <td>{{ car.pit_stops }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endfor %}
+
+    <!-- ─── STINT TRACKER ────────────────────────────────────────── -->
+    <section class="card" id="stints">
+        <h2>Stint &amp; Pit Tracker</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>Current Driver</th>
+                    <th>Pit Stops</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in stints %}
+                <tr>
+                    <td><strong>{{ s.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ s.class_name | lower | replace(' ', '-') }}">{{ s.class_name }}</span></td>
+                    <td>{{ s.team_name }}</td>
+                    <td>{{ s.current_driver }}</td>
+                    <td>{{ s.pit_stops }}</td>
+                    <td>
+                        {% if s.pit_status == 'IN_PIT' %}
+                        <span class="status-pit">IN PIT</span>
+                        {% else %}
+                        <span class="status-track">ON TRACK</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    {% endif %}
+
+</main>
+
+<footer>
+    <p>IMSA Endurance Racing Intelligence Dashboard &mdash; Educational Project</p>
+    <p>Data from publicly accessible IMSA scoring endpoints. Not affiliated with IMSA.</p>
+</footer>
+
+</body>
+</html>
