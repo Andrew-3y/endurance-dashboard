@@ -18,6 +18,28 @@ Deployed at: [endurance-dashboard.onrender.com](https://endurance-dashboard.onre
 
 The dashboard auto-detects the current session type and shows the right analysis for each phase of the race weekend.
 
+### Live + History Modes (FastF1-style usability)
+
+The dashboard now supports two operating modes and switches automatically:
+
+- **Live Mode**: If an IMSA session is active, live timing data is fetched and rendered.
+- **History Mode**: If live data is unavailable, the app loads the latest stored session from SQLite and renders the same analytics views.
+- **Empty-state fallback**: If no live session and no stored sessions are available, the app shows:
+  - `"No active race and no stored sessions available"`
+
+Automatic behavior:
+
+1. Try live data first.
+2. If live data exists, save/update that session in SQLite.
+3. If live data is unavailable, load stored session data.
+4. If storage is empty, show fallback message.
+
+Manual behavior:
+
+- A **Stored Session** dropdown allows selecting a specific saved session.
+- A **Switch to Live Mode** button allows forcing a live attempt.
+- The header shows **Live Mode / History Mode** and **Last updated** timestamp.
+
 ### Practice Session
 | Section | Description |
 |---|---|
@@ -80,6 +102,21 @@ Browser Request
                               Jinja2 Template → HTML Response
 ```
 
+### Persistence Layer (SQLite)
+
+Live snapshots are persisted to SQLite so the dashboard remains usable after sessions end.
+
+- Storage module: `services/storage.py`
+- Default database file: `dashboard.sqlite` (repo root)
+- Optional override via env var: `DASHBOARD_DB_PATH`
+
+Storage functions integrated into `app.py`:
+
+- `list_available_sessions()`
+- `load_session_data(session_id)`
+- `get_latest_session()`
+- `save_session_data(series, entries)` (used after successful live fetch)
+
 ### Adding a New Series (e.g. WEC)
 1. Create `adapters/wec_adapter.py` implementing `BaseAdapter`
 2. Add one line in `app.py`: `ADAPTERS["wec"] = WECAdapter()`
@@ -97,6 +134,7 @@ endurance-dashboard/
 │   └── imsa_adapter.py           # IMSA timing data fetcher and field mapper
 ├── services/
 │   ├── cache.py                  # In-memory TTL cache (default 10s)
+│   ├── storage.py                # SQLite persistence for saved sessions/history mode
 │   ├── data_normalizer.py        # Schema validation, grouping, lap time formatting
 │   ├── session_analyzer.py       # Practice and qualifying specific analysis
 │   ├── anomaly_detector.py       # Pace drop, off-pace, and close battle detection
@@ -172,6 +210,8 @@ http://localhost:5000
 ```
 
 The app will show a "No Live Data" message when no IMSA session is active. Check the [IMSA schedule](https://www.imsa.com/events/) for upcoming sessions.
+
+With persisted storage enabled, the app will automatically load the latest stored session in History Mode when no live session is active.
 
 ---
 
