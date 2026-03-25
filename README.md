@@ -1,60 +1,232 @@
 # IMSA Endurance Racing Intelligence Dashboard
 
-A real-time endurance racing dashboard that fetches live IMSA timing data and displays leaderboards, class battles, anomaly alerts, and overtake predictions.
+A production-ready, real-time web dashboard for IMSA endurance racing data. Built with Python and Flask, it fetches live timing data on demand, performs automated analysis, and presents a clean, dark-themed interface covering every phase of a race weekend — practice, qualifying, and race.
 
-## Features
+Deployed free on Render. No paid APIs. No background workers. No always-on infrastructure.
 
-- **Overall & Class Leaderboards** — Live standings with lap times, gaps, and pit status
-- **Anomaly Detection** — Flags sudden pace drops, off-class-pace cars, and close battles
-- **Overtake Predictions** — Estimates laps until a faster car catches the car ahead
-- **Stint & Pit Tracker** — Current driver, pit stop count, and pit status
-- **On-Demand** — Fetches data only when you open the page (no background workers)
-- **Adapter Architecture** — Designed so new series (WEC, etc.) can be added without rewriting
+---
 
-## Tech Stack
+## Live Demo
 
-- Python / Flask
-- Pandas
-- Jinja2 templates
-- Plain CSS (dark theme)
-- Gunicorn (production server)
+Deployed at: [endurance-dashboard.onrender.com](https://endurance-dashboard.onrender.com)
 
-## Quick Start
+> The Render free tier spins down after 15 minutes of inactivity. First visit after idle takes ~15 seconds to cold start. During an active IMSA session, the dashboard displays live data.
 
-```bash
-pip install -r requirements.txt
-python app.py
-# Open http://localhost:5000
+---
+
+## What It Does
+
+The dashboard auto-detects the current session type and shows the right analysis for each phase of the race weekend.
+
+### Practice Session
+| Section | Description |
+|---|---|
+| Session Summary | Total cars, classes, laps run, field spread, cars with no time |
+| Key Takeaways | Auto-generated insights: fastest car, class leaders, consistency, mileage, tight fields |
+| Class Speed Comparison | Fastest time, slowest time, spread, and average per class — side by side |
+| Fastest Laps (Top 10) | Overall speed ranking by best lap time |
+| Fastest per Class | Top cars in each class with gap to class P1 |
+| Pace Trend | Per-car status: IMPROVING / PEAKED / CLOSE / SEARCHING — who might go faster in qualifying |
+| Consistency Ranking | Gap between last lap and best lap — shows which teams are dialed in |
+| Session Mileage | Laps completed per car — low counts may indicate mechanical issues |
+| No Timed Lap | Cars that entered but never set a lap time |
+
+### Qualifying Session
+| Section | Description |
+|---|---|
+| Qualifying Summary | Total cars, qualified, classes, total laps attempted, pole time, field spread, DNQ count |
+| Key Takeaways | Overall pole, class poles with grid position, tight battles, field spread, DNQ warnings |
+| Pole Position Battles | P1 vs P2 per class with driver names, times, laps used, and gap |
+| Battles to Watch | Every pair within 0.3s — overall and within class — highlighted for the race |
+| Full Grid — Gap Ladder | Gap to car directly ahead AND to pole for every car on the grid |
+| Class Qualifying Results | Per-class grid with class position, overall position, gap to pole, and laps attempted |
+| Did Not Qualify | Cars with no qualifying time — expected to start at the back |
+
+### Race Session
+| Section | Description |
+|---|---|
+| Race Alerts & Anomalies | Pace drops, off-class-pace cars, pit status, close battles flagged in real time |
+| Overtake Predictions | Gap closing rate analysis — estimated laps until a faster car catches the car ahead |
+| Overall Leaderboard | Live standings with lap times, gaps, pit stops, and on-track status |
+| Class Leaderboards | Separate standings for GTP, LMP3, GTD Pro, GTD with class gaps |
+| Stint & Pit Tracker | Current driver, total pit stops, and pit status per car |
+
+---
+
+## Architecture
+
+The system uses an **adapter pattern** so that new racing series can be added without modifying any existing code.
+
+```
+Browser Request
+      │
+      ▼
+  Flask Route (app.py)
+      │
+      ├─ Cache hit? → Return cached data
+      │
+      └─ Cache miss → IMSAAdapter.get_data()
+                            │
+                            ├─ fetch_raw_data()   → scoring.imsa.com (public JSON)
+                            ├─ parse_data()        → extract car entries
+                            └─ normalize_data()    → unified schema
+                                    │
+                                    ├─ session_analyzer  → practice / qualifying analysis
+                                    ├─ anomaly_detector  → pace drops, battles
+                                    ├─ predictor         → overtake estimates, stints
+                                    └─ data_normalizer   → grouping, formatting
+                                    │
+                                    ▼
+                              Jinja2 Template → HTML Response
 ```
 
-## Live Data
+### Adding a New Series (e.g. WEC)
+1. Create `adapters/wec_adapter.py` implementing `BaseAdapter`
+2. Add one line in `app.py`: `ADAPTERS["wec"] = WECAdapter()`
+3. Visit `/wec` — all analysis and UI works automatically
 
-The dashboard shows live timing data during active IMSA sessions (practice, qualifying, race). When no session is active, a friendly message is displayed. Check the [IMSA schedule](https://www.imsa.com/events/) for upcoming sessions.
-
-## Deployment
-
-Configured for Render free tier. See `render.yaml` for deployment settings.
+---
 
 ## Project Structure
 
 ```
-├── app.py                  # Flask entry point
+endurance-dashboard/
+├── app.py                        # Flask entry point, route handling, adapter registry
 ├── adapters/
-│   ├── base_adapter.py     # Abstract adapter interface
-│   └── imsa_adapter.py     # IMSA timing data adapter
+│   ├── base_adapter.py           # Abstract interface all adapters must implement
+│   └── imsa_adapter.py           # IMSA timing data fetcher and field mapper
 ├── services/
-│   ├── cache.py            # In-memory TTL cache
-│   ├── data_normalizer.py  # Validation and grouping
-│   ├── anomaly_detector.py # Pace drop and battle detection
-│   └── predictor.py        # Overtake and stint analysis
+│   ├── cache.py                  # In-memory TTL cache (default 10s)
+│   ├── data_normalizer.py        # Schema validation, grouping, lap time formatting
+│   ├── session_analyzer.py       # Practice and qualifying specific analysis
+│   ├── anomaly_detector.py       # Pace drop, off-pace, and close battle detection
+│   └── predictor.py              # Overtake prediction and stint tracking
 ├── templates/
-│   └── dashboard.html      # Jinja2 template
+│   └── dashboard.html            # Jinja2 template — adapts layout to session type
 ├── static/
-│   └── style.css           # Dark theme styling
+│   └── style.css                 # Dark theme, class badges, responsive layout
 ├── requirements.txt
-└── render.yaml             # Render deployment config
+├── render.yaml                   # Render free-tier deployment config
+└── .gitignore
 ```
 
-## License
+---
 
-Educational project. Not affiliated with IMSA.
+## Normalized Data Schema
+
+Every adapter — regardless of series — must output entries conforming to this schema. This is what makes all downstream services series-agnostic.
+
+| Field | Type | Description |
+|---|---|---|
+| `series` | str | `"IMSA"`, `"WEC"`, etc. |
+| `event_name` | str | e.g. `"Rolex 24 At Daytona"` |
+| `session_name` | str | e.g. `"Race"`, `"Practice 1"` |
+| `car_number` | str | e.g. `"10"`, `"01"` |
+| `team_name` | str | Full team name |
+| `class_name` | str | `"GTP"`, `"LMP3"`, `"GTD"`, `"GTD Pro"` |
+| `current_driver` | str | Driver currently in the car |
+| `overall_position` | int | Position in overall standings |
+| `class_position` | int | Position within class |
+| `laps_completed` | int | Total laps completed |
+| `gap_to_leader` | str/float | Gap to overall leader |
+| `gap_to_class_leader` | str/float | Gap to class leader |
+| `last_lap_time` | float | Last lap in seconds |
+| `best_lap_time` | float | Best lap in seconds |
+| `pit_status` | str | `"IN_PIT"` or `"ON_TRACK"` |
+| `pit_stops` | int | Total pit stops taken |
+| `timestamp` | str | ISO-8601 snapshot time |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Web framework | Python 3.11 / Flask 3.x |
+| Data processing | Pandas |
+| Templates | Jinja2 |
+| Styling | Plain CSS (dark theme, no frameworks) |
+| Production server | Gunicorn |
+| Hosting | Render free tier |
+| Data source | IMSA public scoring API (`scoring.imsa.com`) |
+
+---
+
+## Local Development
+
+**Requirements:** Python 3.10+
+
+```bash
+# Clone the repo
+git clone https://github.com/Andrew-3y/endurance-dashboard.git
+cd endurance-dashboard
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the development server
+python app.py
+
+# Open in browser
+http://localhost:5000
+```
+
+The app will show a "No Live Data" message when no IMSA session is active. Check the [IMSA schedule](https://www.imsa.com/events/) for upcoming sessions.
+
+---
+
+## Deployment on Render
+
+### First-time setup
+
+1. Fork or push this repository to your GitHub account
+2. Go to [render.com](https://render.com) and sign up with GitHub (free)
+3. Click **New → Web Service**
+4. Connect your GitHub repository
+5. Render auto-detects `render.yaml` — verify these settings:
+
+| Setting | Value |
+|---|---|
+| Runtime | Python |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 30` |
+| Plan | Free |
+
+6. Click **Deploy**
+
+No environment variables required.
+
+### Free tier behaviour
+
+- Spins down after **15 minutes of inactivity**
+- Cold start on first request after idle: ~15–20 seconds
+- This is intentional — the app is designed for on-demand use, not always-on
+
+---
+
+## Data Source
+
+IMSA publishes live timing data via publicly accessible JSON endpoints at `scoring.imsa.com` during active sessions. This data is served to every browser that visits the official timing page — this app simply reads the same feed.
+
+**Responsible usage:**
+- Data is fetched once per page load
+- A 10-second in-memory cache prevents repeated calls on quick refreshes
+- A polite `User-Agent` header identifies the request
+- No scraping loops, no background polling
+
+To find the endpoints yourself: open [imsa.com/scoring](https://www.imsa.com/scoring/) during a live session, open browser DevTools (F12), go to the Network tab, filter by XHR/Fetch, and look for requests returning JSON.
+
+---
+
+## How to Test With Live Data
+
+1. Check the [IMSA Events Calendar](https://www.imsa.com/events/) for an upcoming session
+2. Any session works — practice, qualifying, or race
+3. Open the dashboard during the session
+4. The adapter fetches live data and the appropriate analysis view renders automatically
+
+---
+
+## Disclaimer
+
+This is an independent educational project. Not affiliated with, endorsed by, or connected to IMSA (International Motor Sports Association). All timing data is sourced from publicly accessible endpoints.
