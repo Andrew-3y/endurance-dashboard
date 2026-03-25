@@ -97,6 +97,70 @@ header h1 {
     color: var(--text-muted);
 }
 
+.mode-controls {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.mode-badge {
+    display: inline-block;
+    margin-left: 0.75rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.mode-live {
+    background: var(--success);
+    color: #000;
+}
+
+.mode-history {
+    background: var(--warning);
+    color: #000;
+}
+
+.session-selector-form {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.82rem;
+}
+
+.session-selector-form select {
+    background: var(--bg-table-row);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.4rem;
+}
+
+.switch-live-btn {
+    display: inline-block;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    font-size: 0.78rem;
+    color: var(--accent);
+}
+
+.switch-live-btn:hover {
+    background: rgba(88, 166, 255, 0.12);
+    text-decoration: none;
+}
+
+.auto-message {
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--warning);
+}
+
 /* ─── Main Content ──────────────────────────────────────────────────── */
 main {
     max-width: 1400px;
@@ -402,6 +466,8 @@ footer {
     .stats-grid { gap: 0.5rem; }
     .stat-box { min-width: 90px; padding: 0.5rem 0.6rem; }
     .stat-value { font-size: 1.1rem; }
+    .mode-controls { flex-direction: column; align-items: flex-start; }
+    .mode-badge { margin-left: 0; margin-top: 0.3rem; }
 }
 
 @media (max-width: 600px) {

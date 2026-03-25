@@ -14,12 +14,44 @@
         <div class="event-info">
             <span class="event-name">{{ event_info.event_name }}</span>
             <span class="session-name">{{ event_info.session_name }}</span>
+            <span class="mode-badge mode-{{ mode | default('live') }}">
+                {{ "Live Mode" if mode == "live" else "History Mode" }}
+            </span>
             {% if entries %}
             <span class="session-type-badge session-type-{{ event_info.session_type }}">
                 {{ event_info.session_type | upper }}
             </span>
             {% endif %}
         </div>
+        <div class="mode-controls">
+            {% if available_sessions %}
+            <form method="get" class="session-selector-form">
+                <label for="session_id">Stored Session:</label>
+                <select id="session_id" name="session_id" onchange="this.form.submit()">
+                    <option value="">Auto (Live if available)</option>
+                    {% for s in available_sessions %}
+                    <option value="{{ s.session_id }}" {% if selected_session_id == s.session_id %}selected{% endif %}>
+                        {{ s.event_name }} - {{ s.session_name }} ({{ s.last_updated }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
+            {% if mode == "history" %}
+            <a class="switch-live-btn" href="{{ url_for('dashboard', series=event_info.series | lower) }}">
+                Switch to Live Mode
+            </a>
+            {% endif %}
+        </div>
+        {% if auto_message %}
+        <div class="auto-message">{{ auto_message }}</div>
+        {% endif %}
+        {% if live_fetch_error and mode == "history" %}
+        <div class="refresh-hint">{{ live_fetch_error }}</div>
+        {% endif %}
+        {% if last_updated %}
+        <div class="refresh-hint">Last updated: {{ last_updated }}</div>
+        {% endif %}
         <div class="refresh-hint">Data refreshes on page reload (cached 10s)</div>
     </div>
 </header>
@@ -28,12 +60,11 @@
 
     {% if error %}
     <section class="card error-card">
-        <h2>No Live Data Available</h2>
+        <h2>Dashboard Data Unavailable</h2>
         <p>{{ error }}</p>
         <p class="help-text">
-            This usually means there is no active IMSA session right now.
-            Check <a href="https://www.imsa.com/scoring/" target="_blank" rel="noopener">imsa.com/scoring</a>
-            during a live race, qualifying, or practice session.
+            The dashboard tried live mode first, then history mode.
+            No usable data source is currently available.
         </p>
     </section>
     {% endif %}
