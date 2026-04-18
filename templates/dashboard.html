@@ -69,7 +69,215 @@
     </section>
     {% endif %}
 
+    {% if source_links %}
+    <section class="card" id="official-sources">
+        <h2>Official IMSA Sources</h2>
+        <p class="section-desc">These links now complement the current dashboard feed and, when available, the driver tables below are enriched from Al Kamel session documents.</p>
+        <div class="source-links">
+            <a class="source-link" href="{{ source_links.imsa_live_timing }}" target="_blank" rel="noopener noreferrer">IMSA Live Timing</a>
+            <a class="source-link" href="{{ source_links.imsa_results }}" target="_blank" rel="noopener noreferrer">IMSA Historical Results</a>
+            <a class="source-link" href="{{ source_links.imsa_scoring }}" target="_blank" rel="noopener noreferrer">IMSA Scoring Portal</a>
+            {% if source_links.alkamel_page %}
+            <a class="source-link" href="{{ source_links.alkamel_page }}" target="_blank" rel="noopener noreferrer">Matched Al Kamel Event</a>
+            {% endif %}
+            {% if source_links.alkamel_results_json %}
+            <a class="source-link" href="{{ source_links.alkamel_results_json }}" target="_blank" rel="noopener noreferrer">Session Results JSON</a>
+            {% endif %}
+            {% if source_links.alkamel_time_cards_json %}
+            <a class="source-link" href="{{ source_links.alkamel_time_cards_json }}" target="_blank" rel="noopener noreferrer">Time Cards JSON</a>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
     {% if entries %}
+
+    {% if driver_data and driver_data.summary %}
+    <section class="card" id="driver-summary">
+        <h2>Driver Lens</h2>
+        <p class="section-desc">
+            {% if driver_data.source == "alkamel_results" %}
+            A driver-first view built from official Al Kamel session results and time cards.
+            {% else %}
+            A driver-first view built from the current session snapshot. It gives us meaningful per-driver context now while we work toward deeper lap-by-lap attribution later.
+            {% endif %}
+        </p>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">{{ driver_data.summary.total_drivers }}</div>
+                <div class="stat-label">Drivers Shown</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ driver_data.summary.classes_represented }}</div>
+                <div class="stat-label">Classes</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ driver_data.summary.drivers_on_track }}</div>
+                <div class="stat-label">On Track</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ driver_data.summary.drivers_in_pit }}</div>
+                <div class="stat-label">In Pit</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ driver_data.summary.fastest_time | lap_time }}</div>
+                <div class="stat-label">Fastest Driver Lap</div>
+            </div>
+        </div>
+        {% if driver_data.insights %}
+        <div class="alerts-list">
+            {% for insight in driver_data.insights %}
+            <div class="alert alert-info">
+                <span class="alert-badge">{{ insight.type | upper }}</span>
+                {{ insight.message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if driver_data and driver_data.class_leaders %}
+    <section class="card" id="driver-class-leaders">
+        <h2>Driver Class Leaders</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Driver</th>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>{% if event_info.session_type == "race" %}Class Pos{% else %}Best Lap{% endif %}</th>
+                    <th>{% if driver_data.source == "alkamel_results" and event_info.session_type != "race" %}Valid Laps{% else %}Laps{% endif %}</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in driver_data.class_leaders %}
+                <tr>
+                    <td><span class="class-badge class-{{ row.class_name | lower | replace(' ', '-') }}">{{ row.class_name }}</span></td>
+                    <td>{{ row.driver_name }}</td>
+                    <td><strong>{{ row.car_number }}</strong></td>
+                    <td>{{ row.team_name }}</td>
+                    <td>
+                        {% if event_info.session_type == "race" %}
+                        P{{ row.class_position or '--' }}
+                        {% else %}
+                        {{ row.best_lap_time | lap_time }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if driver_data.source == "alkamel_results" and event_info.session_type != "race" %}
+                        {{ row.valid_laps or 0 }}
+                        {% else %}
+                        {{ row.laps_completed }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.pit_status == 'IN_PIT' %}
+                        <span class="status-pit">PIT</span>
+                        {% else %}
+                        <span class="status-track">RUN</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    {% if driver_data and driver_data.leaderboard %}
+    <section class="card" id="driver-leaderboard">
+        <h2>Driver Leaderboard</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Driver</th>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Team</th>
+                    <th>{% if event_info.session_type == "race" %}Overall{% else %}Best Lap{% endif %}</th>
+                    <th>
+                        {% if event_info.session_type == "race" %}
+                        Gap
+                        {% elif driver_data.source == "alkamel_results" %}
+                        Avg Valid Lap
+                        {% else %}
+                        Last Lap
+                        {% endif %}
+                    </th>
+                    <th>
+                        {% if event_info.session_type == "race" %}
+                        Class Pos
+                        {% elif driver_data.source == "alkamel_results" %}
+                        Top Speed
+                        {% else %}
+                        Delta
+                        {% endif %}
+                    </th>
+                    <th>Laps</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in driver_data.leaderboard[:20] %}
+                <tr>
+                    <td>{{ row.driver_name }}</td>
+                    <td><strong>{{ row.car_number }}</strong></td>
+                    <td><span class="class-badge class-{{ row.class_name | lower | replace(' ', '-') }}">{{ row.class_name }}</span></td>
+                    <td>{{ row.team_name }}</td>
+                    <td>
+                        {% if event_info.session_type == "race" %}
+                        P{{ row.overall_position or '--' }}
+                        {% else %}
+                        {{ row.best_lap_time | lap_time }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if event_info.session_type == "race" %}
+                        {{ row.gap_to_leader }}
+                        {% elif driver_data.source == "alkamel_results" %}
+                        {{ row.avg_valid_lap | lap_time }}
+                        {% else %}
+                        {{ row.last_lap_time | lap_time }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if event_info.session_type == "race" %}
+                        P{{ row.class_position or '--' }}
+                        {% elif driver_data.source == "alkamel_results" %}
+                        {% if row.top_speed_kph %}
+                        {{ "%.1f" | format(row.top_speed_kph) }} kph
+                        {% else %}
+                        --
+                        {% endif %}
+                        {% elif row.lap_delta is none %}
+                        --
+                        {% else %}
+                        {{ "%+.3f" | format(row.lap_delta) }}s
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if driver_data.source == "alkamel_results" and row.valid_laps is not none %}
+                        {{ row.valid_laps }} / {{ row.laps_completed }}
+                        {% else %}
+                        {{ row.laps_completed }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.pit_status == 'IN_PIT' %}
+                        <span class="status-pit">PIT</span>
+                        {% else %}
+                        <span class="status-track">RUN</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
 
     {# ═══════════════════════════════════════════════════════════════════
        ██  PRACTICE SESSION VIEW

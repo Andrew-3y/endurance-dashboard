@@ -12,6 +12,8 @@ Deployed at: [endurance-dashboard.onrender.com](https://endurance-dashboard.onre
 
 > The Render free tier spins down after 15 minutes of inactivity. First visit after idle takes ~15 seconds to cold start. During an active IMSA session, the dashboard displays live data.
 
+> Recent development added driver-focused views and official IMSA / Al Kamel session enrichment for stronger driver-level analysis.
+
 ---
 
 ## What It Does
@@ -73,6 +75,14 @@ Manual behavior:
 | Class Leaderboards | Separate standings for GTP, LMP3, GTD Pro, GTD with class gaps |
 | Stint & Pit Tracker | Current driver, total pit stops, and pit status per car |
 
+### Driver Analytics
+| Section | Description |
+|---|---|
+| Driver Lens | Driver-first summary cards showing visible drivers, on-track vs in-pit counts, and quickest visible lap |
+| Driver Class Leaders | Best current driver reference per class |
+| Driver Leaderboard | Driver-focused ranking for practice, qualifying, and race |
+| Official Driver Enrichment | When available, driver views are enriched from official Al Kamel session documents rather than only the current car snapshot |
+
 ---
 
 ## Architecture
@@ -96,6 +106,8 @@ Browser Request
                                     ├─ session_analyzer  → practice / qualifying analysis
                                     ├─ anomaly_detector  → pace drops, battles
                                     ├─ predictor         → overtake estimates, stints
+                                    ├─ driver_analyzer   → driver-centric views
+                                    ├─ alkamel_results   → official IMSA results/time-card enrichment
                                     └─ data_normalizer   → grouping, formatting
                                     │
                                     ▼
@@ -116,6 +128,20 @@ Storage functions integrated into `app.py`:
 - `load_session_data(session_id)`
 - `get_latest_session()`
 - `save_session_data(series, entries)` (used after successful live fetch)
+
+### Official IMSA Results Enrichment
+
+The dashboard can now enrich IMSA sessions using official Al Kamel sources:
+
+- `https://imsa.results.alkamelcloud.com/`
+- `https://livetiming.alkamelsystems.com/imsa`
+
+The Al Kamel results site exposes structured session exports such as:
+
+- `Session Results JSON`
+- `Time Cards JSON`
+
+Time cards include lap records tagged by `driver_number`, which allows the dashboard to compute true per-driver session metrics when a matching event/session is available.
 
 ### Adding a New Series (e.g. WEC)
 1. Create `adapters/wec_adapter.py` implementing `BaseAdapter`
@@ -138,7 +164,9 @@ endurance-dashboard/
 │   ├── data_normalizer.py        # Schema validation, grouping, lap time formatting
 │   ├── session_analyzer.py       # Practice and qualifying specific analysis
 │   ├── anomaly_detector.py       # Pace drop, off-pace, and close battle detection
-│   └── predictor.py              # Overtake prediction and stint tracking
+│   ├── predictor.py              # Overtake prediction and stint tracking
+│   ├── driver_analyzer.py        # Driver-first analytics and summary views
+│   └── alkamel_results.py        # Official Al Kamel session/time-card enrichment
 ├── templates/
 │   └── dashboard.html            # Jinja2 template — adapts layout to session type
 ├── static/
@@ -186,7 +214,7 @@ Every adapter — regardless of series — must output entries conforming to thi
 | Styling | Plain CSS (dark theme, no frameworks) |
 | Production server | Gunicorn |
 | Hosting | Render free tier |
-| Data source | IMSA public scoring API (`scoring.imsa.com`) |
+| Data source | IMSA public scoring API (`scoring.imsa.com`) + official IMSA / Al Kamel results documents |
 
 ---
 
@@ -256,6 +284,15 @@ IMSA publishes live timing data via publicly accessible JSON endpoints at `scori
 
 To find the endpoints yourself: open [imsa.com/scoring](https://www.imsa.com/scoring/) during a live session, open browser DevTools (F12), go to the Network tab, filter by XHR/Fetch, and look for requests returning JSON.
 
+### Official Results Documents
+
+The dashboard also uses official IMSA / Al Kamel result exports when available for driver-level enrichment.
+
+- Results portal: [imsa.results.alkamelcloud.com](https://imsa.results.alkamelcloud.com/)
+- Live timing portal: [livetiming.alkamelsystems.com/imsa](https://livetiming.alkamelsystems.com/imsa)
+
+This allows the app to attach official `Results JSON` and `Time Cards JSON` data to the dashboard and improve driver-specific views beyond the live car snapshot alone.
+
 ---
 
 ## How to Test With Live Data
@@ -269,4 +306,4 @@ To find the endpoints yourself: open [imsa.com/scoring](https://www.imsa.com/sco
 
 ## Disclaimer
 
-This is an independent educational project. Not affiliated with, endorsed by, or connected to IMSA (International Motor Sports Association). All timing data is sourced from publicly accessible endpoints.
+This is an independent educational project. Not affiliated with, endorsed by, or connected to IMSA (International Motor Sports Association) or Al Kamel Systems. All timing data is sourced from publicly accessible endpoints and published result documents.

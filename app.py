@@ -39,6 +39,8 @@ from services.data_normalizer import (
     group_by_class,
     validate_entries,
 )
+from services.alkamel_results import get_alkamel_session_data
+from services.driver_analyzer import build_driver_analysis
 from services.predictor import compute_stint_info, predict_overtakes
 from services.session_analyzer import analyze_practice, analyze_qualifying
 from services.storage import (
@@ -69,6 +71,12 @@ ADAPTERS = {
 CACHES = {
     series: SimpleCache(ttl_seconds=10)
     for series in ADAPTERS
+}
+
+SOURCE_LINKS = {
+    "imsa_live_timing": "https://livetiming.alkamelsystems.com/imsa",
+    "imsa_results": "https://imsa.results.alkamelcloud.com/",
+    "imsa_scoring": "https://www.imsa.com/scoring/",
 }
 
 # Register the lap time formatter so templates can use it
@@ -198,6 +206,8 @@ def dashboard(series: str):
             stints=[],
             practice={},
             qualifying={},
+            driver_data={},
+            source_links=SOURCE_LINKS,
             mode="history",
             available_sessions=[],
             selected_session_id=None,
@@ -271,6 +281,8 @@ def dashboard(series: str):
         stints=[],
         practice={},
         qualifying={},
+        driver_data={},
+        source_links=SOURCE_LINKS,
         mode="history",
         available_sessions=available_sessions,
         selected_session_id=requested_session_id,
@@ -300,6 +312,8 @@ def _render_dashboard(
     event_info = get_event_info(entries)
     classes = group_by_class(entries)
     session_type = event_info.get("session_type", "race")
+    alkamel_data = get_alkamel_session_data(entries) if event_info.get("series") == "IMSA" else None
+    driver_data = build_driver_analysis(entries, session_type, official_data=alkamel_data)
 
     # Always compute these (useful for all session types)
     anomalies = detect_anomalies(entries)
@@ -329,6 +343,13 @@ def _render_dashboard(
         stints=stints,
         practice=practice_data,
         qualifying=qualifying_data,
+        driver_data=driver_data,
+        source_links={
+            **SOURCE_LINKS,
+            "alkamel_page": (alkamel_data or {}).get("page_url"),
+            "alkamel_results_json": (alkamel_data or {}).get("results_json_url"),
+            "alkamel_time_cards_json": (alkamel_data or {}).get("time_cards_json_url"),
+        },
         mode=mode,
         available_sessions=available_sessions or [],
         selected_session_id=selected_session_id,

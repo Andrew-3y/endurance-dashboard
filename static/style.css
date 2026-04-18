@@ -202,6 +202,27 @@ main {
 }
 
 /* ─── Tables ────────────────────────────────────────────────────────── */
+.source-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.source-link {
+    display: inline-block;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-primary);
+    background: var(--bg-table-row);
+}
+
+.source-link:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    text-decoration: none;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

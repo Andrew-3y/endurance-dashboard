@@ -1,4 +1,10 @@
 {
+  "git.path": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "git.enabled": true,
+  "git.decorations.enabled": true,
+  "explorer.decorations.badges": true,
+  "explorer.decorations.colors": true,
+  "scm.alwaysShowProviders": true,
   "python.defaultInterpreterPath": "C:\\Python314\\python.exe",
   "python.analysis.extraPaths": [
     "."
