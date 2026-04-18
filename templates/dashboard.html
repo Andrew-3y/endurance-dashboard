@@ -90,6 +90,50 @@
     </section>
     {% endif %}
 
+    {% if alkamel_live %}
+    <section class="card" id="alkamel-live">
+        <h2>Al Kamel Live Feed</h2>
+        <p class="section-desc">Live metadata pulled directly from the IMSA Al Kamel timing service.</p>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">{{ alkamel_live.feed_name | upper }}</div>
+                <div class="stat-label">Feed</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ "LIVE" if alkamel_live.running else "IDLE" }}</div>
+                <div class="stat-label">Feed Status</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ alkamel_live.session_count }}</div>
+                <div class="stat-label">Published Sessions</div>
+            </div>
+        </div>
+        {% if alkamel_live.next_message_text %}
+        <p class="section-desc">{{ alkamel_live.next_message_text }}</p>
+        {% endif %}
+        {% if alkamel_live.sessions %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Session</th>
+                    <th>UTC Start</th>
+                    <th>UTC End</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in alkamel_live.sessions[:10] %}
+                <tr>
+                    <td>{{ session.name }}</td>
+                    <td>{{ session.date or '--' }}</td>
+                    <td>{{ session.end_date or '--' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+    {% endif %}
+
     {% if entries %}
 
     {% if driver_data and driver_data.summary %}

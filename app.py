@@ -40,6 +40,7 @@ from services.data_normalizer import (
     validate_entries,
 )
 from services.alkamel_results import get_alkamel_session_data
+from services.alkamel_live import get_alkamel_live_feed_data
 from services.driver_analyzer import build_driver_analysis
 from services.predictor import compute_stint_info, predict_overtakes
 from services.session_analyzer import analyze_practice, analyze_qualifying
@@ -72,6 +73,7 @@ CACHES = {
     series: SimpleCache(ttl_seconds=10)
     for series in ADAPTERS
 }
+ALKAMEL_LIVE_CACHE = SimpleCache(ttl_seconds=30)
 
 SOURCE_LINKS = {
     "imsa_live_timing": "https://livetiming.alkamelsystems.com/imsa",
@@ -100,6 +102,16 @@ def _safe_list_available_sessions(series: str) -> list[dict]:
     except Exception:
         logger.exception("Failed listing stored sessions for %s", series)
         return []
+
+
+def _get_cached_alkamel_live_data() -> dict | None:
+    cached = ALKAMEL_LIVE_CACHE.get()
+    if cached is not None:
+        return cached
+    data = get_alkamel_live_feed_data()
+    if data:
+        ALKAMEL_LIVE_CACHE.set(data)
+    return data
 
 
 def get_live_data(series: str, adapter: IMSAAdapter, cache: SimpleCache) -> tuple[list[dict], str | None]:
@@ -207,6 +219,7 @@ def dashboard(series: str):
             practice={},
             qualifying={},
             driver_data={},
+            alkamel_live={},
             source_links=SOURCE_LINKS,
             mode="history",
             available_sessions=[],
@@ -282,6 +295,7 @@ def dashboard(series: str):
         practice={},
         qualifying={},
         driver_data={},
+        alkamel_live={},
         source_links=SOURCE_LINKS,
         mode="history",
         available_sessions=available_sessions,
@@ -313,6 +327,7 @@ def _render_dashboard(
     classes = group_by_class(entries)
     session_type = event_info.get("session_type", "race")
     alkamel_data = get_alkamel_session_data(entries) if event_info.get("series") == "IMSA" else None
+    alkamel_live_data = _get_cached_alkamel_live_data() if event_info.get("series") == "IMSA" else None
     driver_data = build_driver_analysis(entries, session_type, official_data=alkamel_data)
 
     # Always compute these (useful for all session types)
@@ -344,6 +359,7 @@ def _render_dashboard(
         practice=practice_data,
         qualifying=qualifying_data,
         driver_data=driver_data,
+        alkamel_live=alkamel_live_data,
         source_links={
             **SOURCE_LINKS,
             "alkamel_page": (alkamel_data or {}).get("page_url"),

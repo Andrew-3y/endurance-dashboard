@@ -83,6 +83,12 @@ Manual behavior:
 | Driver Leaderboard | Driver-focused ranking for practice, qualifying, and race |
 | Official Driver Enrichment | When available, driver views are enriched from official Al Kamel session documents rather than only the current car snapshot |
 
+### Official Source Intelligence
+| Section | Description |
+|---|---|
+| Official IMSA Sources | Direct links to the live timing app, historical results portal, matched event page, and official session JSON exports |
+| Al Kamel Live Feed | Live IMSA feed metadata pulled from the Al Kamel timing service, including feed status and published session schedule |
+
 ---
 
 ## Architecture
@@ -107,6 +113,7 @@ Browser Request
                                     ├─ anomaly_detector  → pace drops, battles
                                     ├─ predictor         → overtake estimates, stints
                                     ├─ driver_analyzer   → driver-centric views
+                                    ├─ alkamel_live      → live IMSA feed metadata via Al Kamel WebSocket
                                     ├─ alkamel_results   → official IMSA results/time-card enrichment
                                     └─ data_normalizer   → grouping, formatting
                                     │
@@ -143,6 +150,13 @@ The Al Kamel results site exposes structured session exports such as:
 
 Time cards include lap records tagged by `driver_number`, which allows the dashboard to compute true per-driver session metrics when a matching event/session is available.
 
+The live timing app also exposes a Meteor / DDP feed. The dashboard now uses that live connection for additional metadata such as:
+
+- whether the IMSA live feed is currently running
+- the feed's published session count
+- live session schedule documents exposed by the service
+- the live feed's official results URL and next-session message
+
 ### Adding a New Series (e.g. WEC)
 1. Create `adapters/wec_adapter.py` implementing `BaseAdapter`
 2. Add one line in `app.py`: `ADAPTERS["wec"] = WECAdapter()`
@@ -166,6 +180,7 @@ endurance-dashboard/
 │   ├── anomaly_detector.py       # Pace drop, off-pace, and close battle detection
 │   ├── predictor.py              # Overtake prediction and stint tracking
 │   ├── driver_analyzer.py        # Driver-first analytics and summary views
+│   ├── alkamel_live.py           # Live Al Kamel feed metadata client
 │   └── alkamel_results.py        # Official Al Kamel session/time-card enrichment
 ├── templates/
 │   └── dashboard.html            # Jinja2 template — adapts layout to session type
@@ -212,6 +227,7 @@ Every adapter — regardless of series — must output entries conforming to thi
 | Data processing | Native Python services |
 | Templates | Jinja2 |
 | Styling | Plain CSS (dark theme, no frameworks) |
+| Live transport client | `websocket-client` |
 | Production server | Gunicorn |
 | Hosting | Render free tier |
 | Data source | IMSA public scoring API (`scoring.imsa.com`) + official IMSA / Al Kamel results documents |
@@ -292,6 +308,20 @@ The dashboard also uses official IMSA / Al Kamel result exports when available f
 - Live timing portal: [livetiming.alkamelsystems.com/imsa](https://livetiming.alkamelsystems.com/imsa)
 
 This allows the app to attach official `Results JSON` and `Time Cards JSON` data to the dashboard and improve driver-specific views beyond the live car snapshot alone.
+
+### Official Live Timing Feed
+
+The dashboard also pulls additional IMSA live metadata from the Al Kamel live timing service:
+
+- live feed availability
+- published session schedule
+- next-session messaging exposed by the service
+- feed-level metadata tied to the official IMSA live timing app
+
+This means both official Al Kamel links now contribute data:
+
+- the results portal for historical / document-based enrichment
+- the live timing service for live feed metadata
 
 ---
 
