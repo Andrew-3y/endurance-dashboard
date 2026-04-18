@@ -86,7 +86,46 @@
             {% if source_links.alkamel_time_cards_json %}
             <a class="source-link" href="{{ source_links.alkamel_time_cards_json }}" target="_blank" rel="noopener noreferrer">Time Cards JSON</a>
             {% endif %}
+            {% if source_links.alkamel_grid_json %}
+            <a class="source-link" href="{{ source_links.alkamel_grid_json }}" target="_blank" rel="noopener noreferrer">Grid JSON</a>
+            {% endif %}
         </div>
+    </section>
+    {% endif %}
+
+    {% if alkamel_results and alkamel_results.event_sessions %}
+    <section class="card" id="alkamel-history">
+        <h2>Official Session Explorer</h2>
+        <p class="section-desc">Official Al Kamel documents available for the matched IMSA event.</p>
+        {% if alkamel_results.matched_session_docs %}
+        <div class="source-links">
+            {% for doc in alkamel_results.matched_session_docs %}
+            <a class="source-link" href="{{ doc.url }}" target="_blank" rel="noopener noreferrer">{{ doc.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Session</th>
+                    <th>Documents</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in alkamel_results.event_sessions %}
+                <tr>
+                    <td>{{ session.session_name }}</td>
+                    <td>
+                        <div class="source-links">
+                            {% for doc in session.documents[:6] %}
+                            <a class="source-link" href="{{ doc.url }}" target="_blank" rel="noopener noreferrer">{{ doc.format }} {{ doc.label }}</a>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </section>
     {% endif %}
 
@@ -192,7 +231,15 @@
                     <th>#</th>
                     <th>Team</th>
                     <th>{% if event_info.session_type == "race" %}Class Pos{% else %}Best Lap{% endif %}</th>
-                    <th>{% if driver_data.source == "alkamel_results" and event_info.session_type != "race" %}Valid Laps{% else %}Laps{% endif %}</th>
+                    <th>
+                        {% if driver_data.source == "alkamel_results" and event_info.session_type == "race" %}
+                        Role
+                        {% elif driver_data.source == "alkamel_results" and event_info.session_type != "race" %}
+                        Valid Laps
+                        {% else %}
+                        Laps
+                        {% endif %}
+                    </th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -211,7 +258,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if driver_data.source == "alkamel_results" and event_info.session_type != "race" %}
+                        {% if driver_data.source == "alkamel_results" and event_info.session_type == "race" %}
+                        {{ "Starter" if row.pit_status == "STARTING" else "Lineup" }}
+                        {% elif driver_data.source == "alkamel_results" and event_info.session_type != "race" %}
                         {{ row.valid_laps or 0 }}
                         {% else %}
                         {{ row.laps_completed }}
@@ -220,6 +269,10 @@
                     <td>
                         {% if row.pit_status == 'IN_PIT' %}
                         <span class="status-pit">PIT</span>
+                        {% elif row.pit_status == 'STARTING' %}
+                        <span class="status-track">START</span>
+                        {% elif row.pit_status == 'LINEUP' %}
+                        <span class="status-track">LINEUP</span>
                         {% else %}
                         <span class="status-track">RUN</span>
                         {% endif %}
@@ -244,7 +297,11 @@
                     <th>{% if event_info.session_type == "race" %}Overall{% else %}Best Lap{% endif %}</th>
                     <th>
                         {% if event_info.session_type == "race" %}
+                        {% if driver_data.source == "alkamel_results" %}
+                        Best / Qual
+                        {% else %}
                         Gap
+                        {% endif %}
                         {% elif driver_data.source == "alkamel_results" %}
                         Avg Valid Lap
                         {% else %}
@@ -253,7 +310,11 @@
                     </th>
                     <th>
                         {% if event_info.session_type == "race" %}
+                        {% if driver_data.source == "alkamel_results" %}
+                        Top Speed
+                        {% else %}
                         Class Pos
+                        {% endif %}
                         {% elif driver_data.source == "alkamel_results" %}
                         Top Speed
                         {% else %}
@@ -280,7 +341,11 @@
                     </td>
                     <td>
                         {% if event_info.session_type == "race" %}
+                        {% if driver_data.source == "alkamel_results" %}
+                        {{ row.best_lap_time | lap_time }}
+                        {% else %}
                         {{ row.gap_to_leader }}
+                        {% endif %}
                         {% elif driver_data.source == "alkamel_results" %}
                         {{ row.avg_valid_lap | lap_time }}
                         {% else %}
@@ -289,7 +354,15 @@
                     </td>
                     <td>
                         {% if event_info.session_type == "race" %}
+                        {% if driver_data.source == "alkamel_results" %}
+                        {% if row.top_speed_kph %}
+                        {{ "%.1f" | format(row.top_speed_kph) }} kph
+                        {% else %}
+                        --
+                        {% endif %}
+                        {% else %}
                         P{{ row.class_position or '--' }}
+                        {% endif %}
                         {% elif driver_data.source == "alkamel_results" %}
                         {% if row.top_speed_kph %}
                         {{ "%.1f" | format(row.top_speed_kph) }} kph
@@ -303,7 +376,9 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if driver_data.source == "alkamel_results" and row.valid_laps is not none %}
+                        {% if driver_data.source == "alkamel_results" and event_info.session_type == "race" %}
+                        {{ "Starter" if row.pit_status == "STARTING" else "Lineup" }}
+                        {% elif driver_data.source == "alkamel_results" and row.valid_laps is not none %}
                         {{ row.valid_laps }} / {{ row.laps_completed }}
                         {% else %}
                         {{ row.laps_completed }}
@@ -312,6 +387,10 @@
                     <td>
                         {% if row.pit_status == 'IN_PIT' %}
                         <span class="status-pit">PIT</span>
+                        {% elif row.pit_status == 'STARTING' %}
+                        <span class="status-track">START</span>
+                        {% elif row.pit_status == 'LINEUP' %}
+                        <span class="status-track">LINEUP</span>
                         {% else %}
                         <span class="status-track">RUN</span>
                         {% endif %}

@@ -29,7 +29,7 @@ def build_driver_analysis(
     if not entries and not official_data:
         return _empty_driver_analysis()
 
-    if official_data and official_data.get("drivers") and session_type != "race":
+    if official_data and official_data.get("drivers"):
         drivers = _build_official_driver_rows(official_data)
         source = "alkamel_results"
     else:
@@ -108,7 +108,7 @@ def _build_official_driver_rows(official_data: dict[str, Any]) -> list[dict]:
                 "team_name": row.get("team_name", "Unknown Team"),
                 "class_name": row.get("class_name", "Unknown"),
                 "overall_position": row.get("overall_position"),
-                "class_position": None,
+                "class_position": row.get("class_position"),
                 "best_lap_time": row.get("best_lap_time"),
                 "last_lap_time": None,
                 "lap_delta": None,
@@ -210,6 +210,17 @@ def _build_driver_insights(
                 "message": (
                     f"{quickest['driver_name']} is the quickest named driver currently shown "
                     f"in car #{quickest['car_number']} for {quickest['team_name']}."
+                ),
+            }
+        )
+    elif rows and session_type == "race" and source == "alkamel_results":
+        front = rows[0]
+        insights.append(
+            {
+                "type": "race",
+                "message": (
+                    f"Official Al Kamel race driver data is available for car #{front['car_number']} "
+                    f"and its lineup is included in the driver view."
                 ),
             }
         )

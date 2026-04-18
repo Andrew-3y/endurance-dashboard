@@ -83,6 +83,12 @@ Manual behavior:
 | Driver Leaderboard | Driver-focused ranking for practice, qualifying, and race |
 | Official Driver Enrichment | When available, driver views are enriched from official Al Kamel session documents rather than only the current car snapshot |
 
+### Historical / Official Session Tools
+| Section | Description |
+|---|---|
+| Official Session Explorer | Matched Al Kamel event/session document inventory exposed directly inside the dashboard |
+| Race Lineup Support | Race sessions can use official grid documents to show lineup and starting-driver context when full race time cards are not yet available |
+
 ### Official Source Intelligence
 | Section | Description |
 |---|---|
@@ -149,6 +155,8 @@ The Al Kamel results site exposes structured session exports such as:
 - `Time Cards JSON`
 
 Time cards include lap records tagged by `driver_number`, which allows the dashboard to compute true per-driver session metrics when a matching event/session is available.
+
+For matched historical events, the dashboard also exposes the broader Al Kamel session document inventory so you can browse official PDFs, CSVs, and JSON exports directly from the current event context.
 
 The live timing app also exposes a Meteor / DDP feed. The dashboard now uses that live connection for additional metadata such as:
 

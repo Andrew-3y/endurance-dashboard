@@ -62,12 +62,14 @@ def get_alkamel_session_data(entries: list[dict]) -> dict[str, Any] | None:
         page_url = f"{ALKAMEL_RESULTS_BASE}?season={quote_plus(season_value)}&evvent={quote_plus(event_value)}"
         page_html = _fetch_text(page_url)
         docs = _extract_session_documents(page_html)
+        event_sessions = _build_event_sessions(docs)
         session_docs = _pick_session_documents(docs, session_name)
         if not session_docs:
             return None
 
         results_data = None
         time_cards_data = None
+        grid_data = None
 
         if session_docs.get("results_json_url"):
             results_data = _fetch_json(session_docs["results_json_url"])
@@ -75,18 +77,24 @@ def get_alkamel_session_data(entries: list[dict]) -> dict[str, Any] | None:
         if session_docs.get("time_cards_json_url"):
             time_cards_data = _fetch_json(session_docs["time_cards_json_url"])
 
-        if not results_data and not time_cards_data:
+        if session_docs.get("grid_json_url"):
+            grid_data = _fetch_json(session_docs["grid_json_url"])
+
+        if not results_data and not time_cards_data and not grid_data:
             return None
 
-        driver_rows = _build_driver_rows(results_data, time_cards_data)
+        driver_rows = _build_driver_rows(results_data, time_cards_data, grid_data)
 
         return {
             "page_url": page_url,
             "live_timing_url": ALKAMEL_LIVE_URL,
             "results_json_url": session_docs.get("results_json_url"),
             "time_cards_json_url": session_docs.get("time_cards_json_url"),
-            "session": (time_cards_data or results_data or {}).get("session", {}),
+            "grid_json_url": session_docs.get("grid_json_url"),
+            "session": (time_cards_data or results_data or grid_data or {}).get("session", {}),
             "drivers": driver_rows,
+            "event_sessions": event_sessions,
+            "matched_session_docs": session_docs.get("documents", []),
         }
     except Exception:
         logger.exception("Failed loading Al Kamel session data for %s / %s", event_name, session_name)
@@ -188,7 +196,7 @@ def _extract_session_documents(html: str) -> list[dict[str, str]]:
     return docs
 
 
-def _pick_session_documents(docs: list[dict[str, str]], session_name: str) -> dict[str, str] | None:
+def _pick_session_documents(docs: list[dict[str, str]], session_name: str) -> dict[str, Any] | None:
     session_key = _normalize_session_name(session_name)
     matching = [doc for doc in docs if _normalize_session_folder(doc["session_folder"]) == session_key]
     if not matching:
@@ -196,19 +204,24 @@ def _pick_session_documents(docs: list[dict[str, str]], session_name: str) -> di
 
     results_json_url = None
     time_cards_json_url = None
+    grid_json_url = None
     for doc in matching:
         filename = doc["filename"].lower()
         if filename.endswith(".json") and "time cards" in filename:
             time_cards_json_url = doc["url"]
         elif filename.endswith(".json") and "results" in filename and "class" not in filename:
             results_json_url = doc["url"]
+        elif filename.endswith(".json") and "starting grid" in filename:
+            grid_json_url = doc["url"]
 
-    if not results_json_url and not time_cards_json_url:
+    if not results_json_url and not time_cards_json_url and not grid_json_url:
         return None
 
     return {
         "results_json_url": results_json_url,
         "time_cards_json_url": time_cards_json_url,
+        "grid_json_url": grid_json_url,
+        "documents": [_document_summary(doc) for doc in matching],
     }
 
 
@@ -223,7 +236,46 @@ def _normalize_session_folder(folder: str) -> str:
     return _normalize_session_name(label)
 
 
-def _build_driver_rows(results_data: dict[str, Any] | None, time_cards_data: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _build_event_sessions(docs: list[dict[str, str]]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for doc in docs:
+        key = doc["session_folder"]
+        record = grouped.setdefault(
+            key,
+            {
+                "session_folder": key,
+                "session_name": _session_label_from_folder(key),
+                "documents": [],
+            },
+        )
+        record["documents"].append(_document_summary(doc))
+
+    sessions = list(grouped.values())
+    sessions.sort(key=lambda session: session["session_folder"])
+    return sessions
+
+
+def _session_label_from_folder(folder: str) -> str:
+    decoded = unquote(folder)
+    return decoded.split("_", 1)[1] if "_" in decoded else decoded
+
+
+def _document_summary(doc: dict[str, str]) -> dict[str, str]:
+    filename = doc["filename"]
+    label = re.sub(r"\.(json|csv|pdf)$", "", filename, flags=re.I).replace("_", " ")
+    return {
+        "label": label,
+        "filename": filename,
+        "url": doc["url"],
+        "format": filename.rsplit(".", 1)[-1].upper() if "." in filename else "",
+    }
+
+
+def _build_driver_rows(
+    results_data: dict[str, Any] | None,
+    time_cards_data: dict[str, Any] | None,
+    grid_data: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     classification_by_car: dict[str, dict[str, Any]] = {}
     if results_data:
         for row in results_data.get("classification", []):
@@ -232,8 +284,20 @@ def _build_driver_rows(results_data: dict[str, Any] | None, time_cards_data: dic
                 classification_by_car[car_number] = row
 
     driver_rows: list[dict[str, Any]] = []
-    if not time_cards_data:
-        return driver_rows
+    if time_cards_data:
+        return _build_time_card_driver_rows(time_cards_data, classification_by_car)
+
+    if grid_data:
+        return _build_grid_driver_rows(grid_data)
+
+    return driver_rows
+
+
+def _build_time_card_driver_rows(
+    time_cards_data: dict[str, Any],
+    classification_by_car: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    driver_rows: list[dict[str, Any]] = []
 
     for participant in time_cards_data.get("participants", []):
         car_number = str(participant.get("number") or "?")
@@ -274,6 +338,7 @@ def _build_driver_rows(results_data: dict[str, Any] | None, time_cards_data: dic
                     "vehicle": participant.get("vehicle") or "",
                     "manufacturer": participant.get("manufacturer") or "",
                     "overall_position": _to_int(classification.get("position")),
+                    "class_position": _to_int(classification.get("class_position")),
                     "best_lap_time": best_lap,
                     "avg_valid_lap": avg_valid_lap,
                     "laps_completed": len(driver_laps),
@@ -287,6 +352,38 @@ def _build_driver_rows(results_data: dict[str, Any] | None, time_cards_data: dic
 
     driver_rows.sort(key=lambda row: (row.get("best_lap_time") is None, row.get("best_lap_time") or 999999.0))
     return driver_rows
+
+
+def _build_grid_driver_rows(grid_data: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in grid_data.get("grid", []):
+        drivers = row.get("drivers") or []
+        starting_driver_number = str(row.get("starting_driver_number") or "")
+        for driver in drivers:
+            driver_number = str(driver.get("number") or "")
+            rows.append(
+                {
+                    "driver_name": _format_driver_name(driver),
+                    "driver_number": driver_number,
+                    "car_number": str(row.get("number") or "?"),
+                    "team_name": row.get("team") or "Unknown Team",
+                    "class_name": row.get("class") or "Unknown",
+                    "vehicle": row.get("vehicle") or "",
+                    "manufacturer": row.get("manufacturer") or "",
+                    "overall_position": _to_int(row.get("position")),
+                    "class_position": None,
+                    "best_lap_time": _parse_lap_time(row.get("time")),
+                    "avg_valid_lap": None,
+                    "laps_completed": 0,
+                    "valid_laps": 0,
+                    "top_speed_kph": _to_float(row.get("kph")),
+                    "pit_stops": 0,
+                    "gap_to_leader": "--",
+                    "pit_status": "STARTING" if driver_number == starting_driver_number else "LINEUP",
+                }
+            )
+    rows.sort(key=lambda row: (row.get("overall_position") is None, row.get("overall_position") or 9999))
+    return rows
 
 
 def _format_driver_name(driver: dict[str, Any]) -> str:
@@ -312,6 +409,13 @@ def _parse_lap_time(value: Any) -> float | None:
 def _to_int(value: Any) -> int | None:
     try:
         return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_float(value: Any) -> float | None:
+    try:
+        return float(value)
     except (TypeError, ValueError):
         return None
 
