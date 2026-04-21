@@ -345,3 +345,9 @@ This means both official Al Kamel links now contribute data:
 ## Disclaimer
 
 This is an independent educational project. Not affiliated with, endorsed by, or connected to IMSA (International Motor Sports Association) or Al Kamel Systems. All timing data is sourced from publicly accessible endpoints and published result documents.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
